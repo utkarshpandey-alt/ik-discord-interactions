@@ -1,0 +1,7 @@
+{
+  "name": "ik-discord-interactions",
+  "version": "1.0.0",
+  "dependencies": {
+    "tweetnacl": "^1.0.3"
+  }
+}
