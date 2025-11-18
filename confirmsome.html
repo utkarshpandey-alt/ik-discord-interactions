@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Confirm Some Classes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f5f7fb;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .card {
+      background: #ffffff;
+      max-width: 480px;
+      width: 100%;
+      margin: 24px;
+      padding: 24px 20px 28px;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 4px;
+      color: #1f2933;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+    .instructor {
+      font-size: 14px;
+      margin-bottom: 16px;
+      color: #111827;
+    }
+    .instructor span {
+      font-weight: 600;
+      color: #1a56db;
+    }
+    .classes-list {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      max-height: 260px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+      background: #f9fafb;
+    }
+    .class-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 14px;
+      color: #111827;
+    }
+    .class-item + .class-item {
+      border-top: 1px solid #f3f4f6;
+      padding-top: 8px;
+      margin-top: 4px;
+    }
+    .class-item input {
+      margin-top: 2px;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.05s ease;
+      width: 100%;
+    }
+    .btn-primary {
+      background: #1a56db;
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background: #1746b0;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+    .btn-primary:active,
+    .btn-secondary:active {
+      transform: translateY(1px);
+    }
+    .message {
+      font-size: 13px;
+      margin-top: 10px;
+    }
+    .message.error {
+      color: #b91c1c;
+    }
+    .message.success {
+      color: #166534;
+    }
+    .small-note {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Confirm Your Classes</h1>
+    <p class="subtitle">
+      Select the sessions you're able to take. We'll update your schedule accordingly.
+    </p>
+    <div class="instructor">
+      Instructor:&nbsp;<span id="instructorName"></span>
+    </div>
+
+    <form id="confirmForm">
+      <div class="classes-list" id="classesContainer">
+        <!-- Checkboxes will be injected here -->
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn-primary">
+          ✅ Confirm Selected Classes
+        </button>
+        <button type="button" class="btn-secondary" id="selectAllBtn">
+          Select / Deselect All
+        </button>
+      </div>
+
+      <div class="message" id="formMessage"></div>
+      <div class="small-note">
+        This confirmation will be logged automatically in the IK Ops system.
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // 🔗 Your ConfirmSome webhook URL (Make)
+    const WEBHOOK_URL = "https://hook.us2.make.com/3holo7w2kc8395kj5gtcwwvbjg5mxkxc";
+
+    function getQueryParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        instructor: params.get("instructor") || "",
+        action: params.get("action") || "ConfirmSome",
+        classesRaw: params.get("classes") || ""
+      };
+    }
+
+    function renderForm() {
+      const { instructor, classesRaw } = getQueryParams();
+      const instructorNameEl = document.getElementById("instructorName");
+      const classesContainer = document.getElementById("classesContainer");
+
+      instructorNameEl.textContent = instructor || "Instructor";
+
+      // support both | and , as separators
+      const classes = classesRaw
+        .split(/[|,]/)
+        .map(c => c.trim())
+        .filter(c => c.length > 0);
+
+      if (!classes.length) {
+        classesContainer.innerHTML =
+          '<div class="message error">No classes were provided. Please contact the Ops team.</div>';
+        return;
+      }
+
+      classesContainer.innerHTML = "";
+      classes.forEach((cls, index) => {
+        const id = `class_${index}`;
+        const wrapper = document.createElement("label");
+        wrapper.className = "class-item";
+        wrapper.innerHTML = `
+          <input type="checkbox" id="${id}" name="classItem" value="${cls}">
+          <span>${cls}</span>
+        `;
+        classesContainer.appendChild(wrapper);
+      });
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      const { instructor, action } = getQueryParams();
+      const formMessage = document.getElementById("formMessage");
+
+      const checkboxes = Array.from(
+        document.querySelectorAll('input[name="classItem"]:checked')
+      );
+      if (checkboxes.length === 0) {
+        formMessage.textContent = "Please select at least one class.";
+        formMessage.className = "message error";
+        return;
+      }
+
+      const selectedClasses = checkboxes.map(cb => cb.value);
+
+      const payload = {
+        instructor,
+        action,
+        classes: selectedClasses
+      };
+
+      try {
+        formMessage.textContent = "Submitting your response...";
+        formMessage.className = "message";
+
+        const res = await fetch(WEBHOOK_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          throw new Error("Non-200 response from server");
+        }
+
+        formMessage.textContent = "Thank you! Your selections have been recorded.";
+        formMessage.className = "message success";
+
+        document
+          .querySelectorAll('input[name="classItem"], button')
+          .forEach(el => (el.disabled = true));
+      } catch (err) {
+        formMessage.textContent =
+          "Something went wrong while submitting. Please try again or contact Ops.";
+        formMessage.className = "message error";
+      }
+    }
+
+    function setupSelectAll() {
+      const btn = document.getElementById("selectAllBtn");
+      btn.addEventListener("click", () => {
+        const checkboxes = Array.from(
+          document.querySelectorAll('input[name="classItem"]')
+        );
+        const anyUnchecked = checkboxes.some(cb => !cb.checked);
+        checkboxes.forEach(cb => (cb.checked = anyUnchecked));
+      });
+    }
+
+    document
+      .getElementById("confirmForm")
+      .addEventListener("submit", handleSubmit);
+
+    renderForm();
+    setupSelectAll();
+  </script>
+</body>
+</html>
